@@ -1,7 +1,4 @@
 # Airflow Providers
-apache-airflow-providers-mysql==5.5.0
-apache-airflow-providers-postgres==5.10.0
-apache-airflow-providers-apache-spark==4.7.1
 
 # Database Connectors
 mysqlclient==2.2.1

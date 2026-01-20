@@ -1,126 +1,65 @@
 x-airflow-common: &airflow-common
-  image: apache/airflow:2.8.1-python3.11
+  build: .
   environment: &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
-    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres-airflow/airflow
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres_airflow/airflow
     AIRFLOW__CORE__FERNET_KEY: ""
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
-    AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session"
-    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "true"
-    _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:- }
+    AIRFLOW__SCHEDULER__MIN_FILE_PROCESS_INTERVAL: 10
+    PYTHONPATH: /opt/airflow/dags
+    # Connection configurations
+    AIRFLOW_CONN_MYSQL_STAGING: "mysql://staging_user:staging_pass@mysql:3306/flight_staging"
+    AIRFLOW_CONN_POSTGRES_ANALYTICS: "postgres://analytics_user:analytics_pass@postgres_analytics:5432/flight_analytics"
   volumes:
     - ./airflow/dags:/opt/airflow/dags
-    - ./logs:/opt/airflow/logs
+    - ./airflow/logs:/opt/airflow/logs
     - ./airflow/plugins:/opt/airflow/plugins
     - ./data:/opt/airflow/data
-    - ./sql:/opt/airflow/sql
-  user: "${AIRFLOW_UID:-50000}:0"
   depends_on: &airflow-common-depends-on
-    postgres-airflow:
+    postgres_airflow:
       condition: service_healthy
 
 services:
-  # PostgreSQL for Airflow metadata
-  postgres-airflow:
+  postgres_airflow:
     image: postgres:15
-    container_name: postgres-airflow
+    container_name: postgres_airflow
     environment:
       POSTGRES_USER: airflow
       POSTGRES_PASSWORD: airflow
       POSTGRES_DB: airflow
     volumes:
-      - postgres-airflow-data:/var/lib/postgresql/data
+      - postgres_airflow_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "airflow"]
-      interval: 10s
+      interval: 5s
       retries: 5
-      start_period: 5s
-    restart: always
+    restart: unless-stopped
     networks:
-      - airflow-network
+      - flight_network
 
-  # PostgreSQL for Analytics (Target Database)
-  postgres-analytics:
-    build:
-      context: ./docker/postgresql
-      dockerfile: Dockerfile
-    container_name: postgres-analytics
+  airflow-init:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    container_name: airflow-init
+    command:
+      - -c
+      - |
+        airflow db migrate
+        airflow users create \
+          --username airflow \
+          --firstname Admin \
+          --lastname User \
+          --role Admin \
+          --email admin@example.com \
+          --password airflow 2>/dev/null || true
+        echo "Airflow initialized"
     environment:
-      POSTGRES_USER: analytics_user
-      POSTGRES_PASSWORD: analytics_pass
-      POSTGRES_DB: flight_analytics
-    volumes:
-      - postgres-analytics-data:/var/lib/postgresql/data
-      - ./sql/init_analytics.sql:/docker-entrypoint-initdb.d/init_analytics.sql
-    ports:
-      - "5433:5432"
-    healthcheck:
-      test: ["CMD", "pg_isready", "-U", "analytics_user"]
-      interval: 10s
-      retries: 5
-      start_period: 5s
-    restart: always
+      <<: *airflow-common-env
     networks:
-      - airflow-network
+      - flight_network
+    restart: "no"
 
-  # MySQL for Staging Database
-  mysql-staging:
-    build:
-      context: ./docker/mysql
-      dockerfile: Dockerfile
-    container_name: mysql-staging
-    environment:
-      MYSQL_ROOT_PASSWORD: root_pass
-      MYSQL_DATABASE: flight_staging
-      MYSQL_USER: staging_user
-      MYSQL_PASSWORD: staging_pass
-    volumes:
-      - mysql-staging-data:/var/lib/mysql
-      - ./sql/init_staging.sql:/docker-entrypoint-initdb.d/init_staging.sql
-    ports:
-      - "3307:3306"
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "mysqladmin",
-          "ping",
-          "-h",
-          "localhost",
-          "-u",
-          "staging_user",
-          "-pstaging_pass",
-        ]
-      interval: 10s
-      retries: 5
-      start_period: 10s
-    restart: always
-    networks:
-      - airflow-network
-
-  # Apache Spark (Optional for large-scale processing)
-  spark-master:
-    build:
-      context: ./docker/spark
-      dockerfile: Dockerfile
-    container_name: spark-master
-    environment:
-      - SPARK_MODE=master
-      - SPARK_RPC_AUTHENTICATION_ENABLED=no
-      - SPARK_RPC_ENCRYPTION_ENABLED=no
-      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
-      - SPARK_SSL_ENABLED=no
-    ports:
-      - "8081:8080"
-      - "7077:7077"
-    volumes:
-      - ./spark:/opt/spark-apps
-      - ./data:/opt/spark-data
-    networks:
-      - airflow-network
-
-  # Airflow Webserver
   airflow-webserver:
     <<: *airflow-common
     command: webserver
@@ -133,75 +72,80 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
-    restart: always
+    restart: unless-stopped
     depends_on:
-      <<: *airflow-common-depends-on
+      postgres_airflow:
+        condition: service_healthy
       airflow-init:
         condition: service_completed_successfully
+      mysql:
+        condition: service_healthy
+      postgres_analytics:
+        condition: service_healthy
     networks:
-      - airflow-network
+      - flight_network
 
-  # Airflow Scheduler
   airflow-scheduler:
     <<: *airflow-common
     command: scheduler
     container_name: airflow-scheduler
-    healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:8974/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-    restart: always
+    restart: unless-stopped
     depends_on:
-      <<: *airflow-common-depends-on
+      postgres_airflow:
+        condition: service_healthy
       airflow-init:
         condition: service_completed_successfully
+      mysql:
+        condition: service_healthy
+      postgres_analytics:
+        condition: service_healthy
     networks:
-      - airflow-network
+      - flight_network
 
-  # Airflow Initialization
-  airflow-init:
-    <<: *airflow-common
-    entrypoint: /bin/bash
-    container_name: airflow-init
-    command:
-      - -c
-      - |
-        mkdir -p /sources/logs /sources/dags /sources/plugins
-        chown -R "${AIRFLOW_UID}:0" /sources/{logs,dags,plugins}
-        exec /entrypoint airflow version
+  mysql:
+    image: mysql:8.0
+    container_name: mysql-staging
     environment:
-      <<: *airflow-common-env
-      _AIRFLOW_DB_MIGRATE: "true"
-      _AIRFLOW_WWW_USER_CREATE: "true"
-      _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-airflow}
-      _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD:-airflow}
-    user: "0:0"
+      MYSQL_ROOT_PASSWORD: root_pass
+      MYSQL_DATABASE: flight_staging
+      MYSQL_USER: staging_user
+      MYSQL_PASSWORD: staging_pass
     volumes:
-      - ./airflow:/sources
+      - mysql_staging_data:/var/lib/mysql
+      - ./sql:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
     networks:
-      - airflow-network
+      - flight_network
 
-  airflow-cli:
-    <<: *airflow-common
-    profiles:
-      - debug
+  postgres_analytics:
+    image: postgres:15
+    container_name: postgres-analytics
     environment:
-      <<: *airflow-common-env
-      CONNECTION_CHECK_MAX_COUNT: "0"
-    command:
-      - bash
-      - -c
-      - airflow
+      POSTGRES_USER: analytics_user
+      POSTGRES_PASSWORD: analytics_pass
+      POSTGRES_DB: flight_analytics
+    volumes:
+      - postgres_analytics_data:/var/lib/postgresql/data
+      - ./sql:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "analytics_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
     networks:
-      - airflow-network
-
-networks:
-  airflow-network:
-    driver: bridge
+      - flight_network
 
 volumes:
-  postgres-airflow-data:
-  postgres-analytics-data:
-  mysql-staging-data:
+  postgres_airflow_data:
+  postgres_analytics_data:
+  mysql_staging_data:
+
+networks:
+  flight_network:
+    driver: bridge
