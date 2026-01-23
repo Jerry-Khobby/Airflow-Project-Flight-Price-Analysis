@@ -1,4 +1,5 @@
-from spark.utils import write_df_to_mysql, setup_logger
+# spark/etl/load.py
+from spark.utils import write_df_to_mysql, setup_logger  # FIXED
 
 logger = setup_logger("load", "/opt/airflow/logs/load.log")
 

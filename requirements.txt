@@ -1,26 +1,2 @@
-# Airflow Providers
-
-# Database Connectors
-mysqlclient==2.2.1
-psycopg2-binary==2.9.9
-pymysql==1.1.0
-SQLAlchemy==1.4.51
-
-# Data Processing
-pandas==2.1.4
-numpy==1.26.3
-openpyxl==3.1.2
-
-# Utilities
-python-dotenv==1.0.0
-pytz==2023.3.post1
-
-# Spark (Optional)
-pyspark==3.5.0
-
-# Validation & Quality
-great-expectations==0.18.8
-cerberus==1.3.5
-
-# Logging & Monitoring
-colorlog==6.8.0
+pyspark==3.5.1
+python-decouple==3.8

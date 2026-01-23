@@ -1,8 +1,8 @@
-# spark/extract.py
+# spark/etl/extract.py
 import os
 from pyspark.sql import SparkSession
 from spark.utils import setup_logger, write_df_to_mysql
-from spark.spark_schema import SPARK_SCHEMA
+from spark.spark_schema import SPARK_SCHEMA  
 
 logger = setup_logger("extract", "/opt/airflow/logs/extract.log")
 

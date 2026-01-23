@@ -1,39 +1,47 @@
-# Stage 1: Get Spark
+# Stage 1: Get Spark (remains the same)
 FROM apache/spark:3.5.1-python3 AS spark
 
-# Stage 2: Airflow
+# Stage 2: Build Airflow image
 FROM apache/airflow:2.8.1-python3.11
 
 USER root
 
-# Copy Spark
+# Copy Spark from the first stage
 COPY --from=spark /opt/spark /opt/spark
 
-# Environment variables
+# Set Spark and Java environment variables
 ENV SPARK_HOME=/opt/spark
 ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 ENV PATH=$PATH:$SPARK_HOME/bin:$JAVA_HOME/bin
+ENV PYTHONPATH=/opt/jobs:/opt/airflow/dags
 
-# Install system dependencies (gcc, dev headers)
+# Install system dependencies (ADDED curl)
 RUN apt-get update && \
   apt-get install -y --no-install-recommends \
-  openjdk-17-jdk \
+  curl \
   default-libmysqlclient-dev \
-  gcc \
-  python3-dev \
-  pkg-config \
+  openjdk-17-jdk \
   procps && \
-  apt-get clean && rm -rf /var/lib/apt/lists/*
+  apt-get clean && \
+  rm -rf /var/lib/apt/lists/*
 
-# Copy requirements
+# Create directory and copy spark module
+RUN mkdir -p /opt/jobs
+COPY spark/ /opt/jobs/spark/
+RUN chown -R airflow /opt/jobs
+
+# Copy project files and install dependencies
 COPY requirements.txt /tmp/requirements.txt
 
-# Switch to airflow user before installing Python packages
+# Switch to the airflow user
 USER airflow
 
-# Install Python dependencies as airflow user
-RUN pip install --upgrade pip && \
+# Added pyspark and updated requirements
+RUN pip install --timeout=1200 --no-cache-dir -r /tmp/requirements.txt && \
   pip install --timeout=1200 --no-cache-dir \
+  pyspark==3.5.1 \
+  apache-airflow-providers-apache-spark==4.5.0 \
+  apache-airflow-providers-mysql==5.5.0 \
+  apache-airflow-providers-postgres==5.10.0 \
   mysqlclient==2.2.1 \
-  psycopg2-binary==2.9.9 && \
-  pip install --timeout=1200 --no-cache-dir -r /tmp/requirements.txt
+  psycopg2-binary==2.9.9
