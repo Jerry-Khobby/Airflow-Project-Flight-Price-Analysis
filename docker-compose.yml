@@ -7,6 +7,8 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
     AIRFLOW__SCHEDULER__MIN_FILE_PROCESS_INTERVAL: 10
+    AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT: 120
+    AIRFLOW__CORE__KILLED_TASK_CLEANUP_TIME: 300
     PYTHONPATH: /opt/jobs:/opt/airflow/dags
     # Connection configurations
     AIRFLOW_CONN_SPARK_DEFAULT: "spark://local[*]"
