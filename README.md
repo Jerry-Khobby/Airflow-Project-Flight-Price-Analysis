@@ -119,25 +119,25 @@ project-root/
 
 ### Source CSV Columns
 
-| Column | Type | Description |
-|--------|------|-------------|
-| Airline | String | Airline name |
-| Source | String | Departure airport code |
-| Source_Name | String | Departure city name |
-| Destination | String | Arrival airport code |
-| Destination_Name | String | Arrival city name |
-| Departure_Datetime | Timestamp | Flight departure time |
-| Arrival_Datetime | Timestamp | Flight arrival time |
-| Duration_Hrs | Float | Flight duration in hours |
-| Stopovers | String | Number/type of stops |
-| Aircraft_Type | String | Aircraft model |
-| Class | String | Travel class (Economy/Business) |
-| Booking_Source | String | Booking platform |
-| Base_Fare_BDT | Decimal(10,2) | Base ticket price |
-| Tax_Surcharge_BDT | Decimal(10,2) | Taxes and surcharges |
-| Total_Fare_BDT | Decimal(10,2) | Total ticket price |
-| Seasonality | String | Peak/Off-peak season |
-| Days_Before_Departure | Integer | Booking advance time |
+| Column                        | Type                 | Description                                    |
+|-------------------------------|----------------------|------------------------------------------------|
+| Airline                       | String               | Airline name                                   |
+| Source                        | String               | Departure airport code                         |
+| Source_Name                   | String               | Departure city name                            |
+| Destination                   | String               | Arrival airport code                           |
+| Destination_Name              | String               | Arrival city name                              |
+| Departure_Datetime            | Timestamp            | Flight departure time                          |
+| Arrival_Datetime              | Timestamp            | Flight arrival time                            |
+| Duration_Hrs                  | Float                | Flight duration in hours                       |
+| Stopovers                     | String               | Number/type of stops                           |
+| Aircraft_Type                 | String               | Aircraft model                                 |
+| Class                         | String               | Travel class (Economy/Business)                |
+| Booking_Source                | String               | Booking platform                               |
+| Base_Fare_BDT                 | Decimal(10,2)        | Base ticket price                              |
+| Tax_Surcharge_BDT             | Decimal(10,2)        | Taxes and surcharges                           |
+| Total_Fare_BDT                | Decimal(10,2)        | Total ticket price                             |
+| Seasonality                   | String               | Peak/Off-peak season                           |
+| Days_Before_Departure         | Integer              | Booking advance time                           |
 
 ---
 
@@ -213,7 +213,7 @@ DAG ID: flight_price_etl
 Schedule: @daily
 Start Date: 2024-01-01
 Catchup: False
-Retries: 1
+Retries: 3
 Retry Delay: 5 minutes
 ```
 
@@ -452,6 +452,10 @@ docker system prune -a --volumes
    - Set up Airflow email alerts
    - Add Prometheus + Grafana monitoring
 
+
+
+## System Architecture Diagram or Workflow Diagram 
+![Airflow Flight Price ETL Architecture](./airflow.drawio.png)
 ---
 ## References
 
