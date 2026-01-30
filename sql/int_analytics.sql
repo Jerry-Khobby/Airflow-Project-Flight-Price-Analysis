@@ -1,55 +1,54 @@
-CREATE TABLE IF NOT EXISTS flights_cleaned (
-    Airline VARCHAR(100),
-    Source CHAR(3),
-    Source_Name VARCHAR(200),
-    Destination CHAR(3),
-    Destination_Name VARCHAR(200),
-    Departure_Datetime TIMESTAMP,
-    Arrival_Datetime TIMESTAMP,
-    Duration_Hrs FLOAT,
-    Stopovers VARCHAR(20),
-    Aircraft_Type VARCHAR(50),
-    Class VARCHAR(20),
-    Booking_Source VARCHAR(50),
-    Base_Fare_BDT NUMERIC(10,2),
-    Tax_Surcharge_BDT NUMERIC(10,2),
-    Total_Fare_BDT NUMERIC(10,2),
-    Seasonality VARCHAR(20),
-    Days_Before_Departure INT
-);
 
+CREATE TABLE IF NOT EXISTS flights_cleaned (
+    Airline VARCHAR(100) NOT NULL,
+    Source CHAR(3) NOT NULL,
+    Source_Name VARCHAR(200) NOT NULL,
+    Destination CHAR(3) NOT NULL,
+    Destination_Name VARCHAR(200) NOT NULL,
+    Departure_Datetime TIMESTAMP NOT NULL,
+    Arrival_Datetime TIMESTAMP NOT NULL,
+    Duration_Hrs NUMERIC(5,2) NOT NULL,
+    Stopovers INT NOT NULL DEFAULT 0,
+    Aircraft_Type VARCHAR(50),
+    Class VARCHAR(20) NOT NULL CHECK (Class IN ('Economy','Business','First')),
+    Booking_Source VARCHAR(50) NOT NULL,
+    Base_Fare_BDT NUMERIC(10,2) NOT NULL,
+    Tax_Surcharge_BDT NUMERIC(10,2) NOT NULL,
+    Total_Fare_BDT NUMERIC(10,2) NOT NULL,
+    Seasonality VARCHAR(20),
+    Days_Before_Departure INT,
+    PRIMARY KEY (Airline, Source, Destination, Departure_Datetime, Booking_Source)
+);
 
 
 CREATE TABLE IF NOT EXISTS avg_fare_by_airline (
-    Airline VARCHAR(100),
-    Avg_Fare_BDT NUMERIC(10,2)
+    Airline VARCHAR(100) NOT NULL PRIMARY KEY,
+    Avg_Fare_BDT NUMERIC(10,2) NOT NULL
 );
-
 
 
 CREATE TABLE IF NOT EXISTS booking_count_by_airline (
-    Airline VARCHAR(100),
-    Booking_Count INT
+    Airline VARCHAR(100) NOT NULL PRIMARY KEY,
+    Booking_Count INT NOT NULL DEFAULT 0
 );
-
 
 
 CREATE TABLE IF NOT EXISTS popular_routes (
-    Source CHAR(3),
-    Destination CHAR(3),
-    Booking_Count INT
+    Source CHAR(3) NOT NULL,
+    Destination CHAR(3) NOT NULL,
+    Booking_Count INT NOT NULL DEFAULT 0,
+    PRIMARY KEY (Source, Destination)
 );
-
 
 
 CREATE TABLE IF NOT EXISTS seasonal_fare_variation (
-    Derived_Season VARCHAR(20),
-    Avg_Fare_BDT NUMERIC(10,2)
+    Derived_Season VARCHAR(20) NOT NULL PRIMARY KEY,
+    Avg_Fare_BDT NUMERIC(10,2) NOT NULL
 );
 
-
-
---to be placed in the read me for testing purposes 
-SELECT *
-FROM avg_fare_by_airline
-ORDER BY Avg_Fare_BDT DESC;
+-- =========================
+-- TEST QUERY (for README/testing)
+-- =========================
+-- SELECT *
+-- FROM avg_fare_by_airline
+-- ORDER BY Avg_Fare_BDT DESC;

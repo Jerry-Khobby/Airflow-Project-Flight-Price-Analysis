@@ -1,7 +1,6 @@
 # Airflow Project: Flight Price Analysis
 
 ## Challenges & Solutions
-
 This project evolved through several architectural and operational iterations. Below is a clear, honest account of the real challenges encountered and how each was resolved.
 
 ### 1. Passing Spark DataFrames via XCom (Design Flaw)

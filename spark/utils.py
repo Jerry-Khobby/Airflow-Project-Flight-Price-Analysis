@@ -21,6 +21,7 @@ def create_spark_session(app_name="FlightPriceETL"):
         SparkSession.builder
         .appName(app_name)
         .master("local[2]")  # Use 2 cores locally
+        .config("spark.ui.port", "4040")
         .config("spark.driver.memory", "2g")
         .config("spark.executor.memory", "2g")
         .config("spark.sql.session.timeZone", "UTC")
@@ -44,7 +45,7 @@ def write_df_to_mysql(df: DataFrame, table_name: str, jdbc_url: str, user: str, 
       .mode(mode) \
       .save()
 
-def write_df_to_postgres(df: DataFrame, table_name: str, jdbc_url: str, user: str, password: str, mode="overwrite"):
+def write_df_to_postgres(df: DataFrame, table_name: str, jdbc_url: str, user: str, password: str, mode="append"):
     df.write \
       .format("jdbc") \
       .option("url", jdbc_url) \

@@ -4,7 +4,7 @@ from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
 from spark.utils import create_spark_session
 from spark.etl.extract import read_csv_to_spark, stage_to_mysql
-from spark.etl.transform import validate_and_clean, compute_kpis
+from spark.etl.transform import validate_and_clean, compute_kpis,derive_season
 from spark.etl.load import load_transformed_to_postgres, load_kpis_to_postgres
 from pyspark import StorageLevel 
 
@@ -47,6 +47,7 @@ def transform_and_load_task():
 
         # Transform
         cleaned_df = validate_and_clean(df)
+        cleaned_df = derive_season(cleaned_df)
 
         # CACHE HERE
         cleaned_df.persist(StorageLevel.MEMORY_AND_DISK)
