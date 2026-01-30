@@ -1,12 +1,12 @@
-# airflow/dags/flight_price_etl.py
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
 from spark.utils import create_spark_session
 from spark.etl.extract import read_csv_to_spark, stage_to_mysql
-from spark.etl.transform import validate_and_clean, compute_kpis,derive_season
+from spark.etl.transform import validate_and_clean, derive_season, compute_kpis
 from spark.etl.load import load_transformed_to_postgres, load_kpis_to_postgres
-from pyspark import StorageLevel 
+from pyspark import StorageLevel
+import os
 
 default_args = {
     'owner': 'airflow',
@@ -17,8 +17,9 @@ default_args = {
     'execution_timeout': timedelta(minutes=30),
 }
 
+TRANSFORMED_PARQUET = "/opt/data/tmp/cleaned_flights.parquet"
+
 def extract_task():
-    """Extract: Read CSV and load to MySQL staging"""
     spark = create_spark_session()
     try:
         df = read_csv_to_spark(spark, "/opt/data/Flight_Price_Dataset_of_Bangladesh.csv")
@@ -32,9 +33,7 @@ def extract_task():
     finally:
         spark.stop()
 
-
-
-def transform_and_load_task():
+def transform_task(**context):
     spark = create_spark_session()
     try:
         df = spark.read.format("jdbc") \
@@ -45,20 +44,27 @@ def transform_and_load_task():
             .option("driver", "com.mysql.cj.jdbc.Driver") \
             .load()
 
-        # Transform
         cleaned_df = validate_and_clean(df)
         cleaned_df = derive_season(cleaned_df)
-
-        # CACHE HERE
         cleaned_df.persist(StorageLevel.MEMORY_AND_DISK)
-
-        # Force materialization (VERY IMPORTANT)
         cleaned_df.count()
 
-        # KPIs reuse cleaned_df
-        kpis = compute_kpis(cleaned_df)
+        os.makedirs(os.path.dirname(TRANSFORMED_PARQUET), exist_ok=True)
+        cleaned_df.write.mode("overwrite").parquet(TRANSFORMED_PARQUET)
 
-        # Load cleaned data
+        context['ti'].xcom_push(key='parquet_path', value=TRANSFORMED_PARQUET)
+        cleaned_df.unpersist()
+    finally:
+        spark.stop()
+
+def load_cleaned_task(**context):
+    spark = create_spark_session()
+    try:
+        parquet_path = context['ti'].xcom_pull(key='parquet_path', task_ids='transform')
+        if not parquet_path or not os.path.exists(parquet_path):
+            raise FileNotFoundError(f"Parquet not found at {parquet_path}")
+
+        cleaned_df = spark.read.parquet(parquet_path)
         load_transformed_to_postgres(
             cleaned_df,
             jdbc_url="jdbc:postgresql://postgres_analytics:5432/psql_db",
@@ -66,22 +72,28 @@ def transform_and_load_task():
             password="psql_pass",
             table_name="flights_cleaned"
         )
+    finally:
+        spark.stop()
 
-        # Load KPIs
+def compute_and_load_kpis_task(**context):
+    spark = create_spark_session()
+    try:
+        parquet_path = context['ti'].xcom_pull(key='parquet_path', task_ids='transform')
+        if not parquet_path or not os.path.exists(parquet_path):
+            raise FileNotFoundError(f"Parquet not found at {parquet_path}")
+
+        cleaned_df = spark.read.parquet(parquet_path)
+        kpis_df = compute_kpis(cleaned_df)
         load_kpis_to_postgres(
-            kpis,
+            kpis_df,
             jdbc_url="jdbc:postgresql://postgres_analytics:5432/psql_db",
             user="psql_user",
             password="psql_pass"
         )
-
-        # Always unpersist
-        cleaned_df.unpersist()
-
     finally:
         spark.stop()
-
-
+        
+        
 with DAG(
     'flight_price_etl',
     default_args=default_args,
@@ -95,10 +107,23 @@ with DAG(
         task_id='extract',
         python_callable=extract_task,
     )
-    
-    transform_load = PythonOperator(
-        task_id='transform_and_load',
-        python_callable=transform_and_load_task,
+
+    transform = PythonOperator(
+        task_id='transform',
+        python_callable=transform_task,
+        provide_context=True,
     )
 
-    extract >> transform_load
+    load_cleaned = PythonOperator(
+        task_id='load_cleaned',
+        python_callable=load_cleaned_task,
+        provide_context=True,
+    )
+
+    compute_and_load_kpis = PythonOperator(
+        task_id='compute_and_load_kpis',
+        python_callable=compute_and_load_kpis_task,
+        provide_context=True,
+    )
+
+    extract >> transform >> [load_cleaned, compute_and_load_kpis]
