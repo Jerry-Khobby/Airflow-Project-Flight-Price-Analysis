@@ -36,6 +36,7 @@ metastore_db/
 
 data/staging/
 data/processed/
+data/tmp
 
 
 
