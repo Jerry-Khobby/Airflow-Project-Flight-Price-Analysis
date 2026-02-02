@@ -314,7 +314,7 @@ These are automatically loaded by Spark via the utils configuration.
    
    # Query results
    SELECT * FROM flights_cleaned LIMIT 10;
-   SELECT * FROM avg_fare_by_airline ORDER BY Avg_Fare_BDT DESC;
+   SELECT * FROM avg_fare_by_airline ORDER BY "Avg_Fare_BDT" DESC;
    SELECT * FROM popular_routes;
    ```
 
