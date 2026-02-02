@@ -34,7 +34,11 @@ def create_spark_session(app_name="FlightPriceETL"):
     )
     return spark
 
-def write_df_to_mysql(df: DataFrame, table_name: str, jdbc_url: str, user: str, password: str, mode="append"):
+
+
+
+
+def write_df_to_mysql(df: DataFrame, table_name: str, jdbc_url: str, user: str, password: str, mode="overwrite"):
     df.write \
       .format("jdbc") \
       .option("url", jdbc_url) \
@@ -45,7 +49,7 @@ def write_df_to_mysql(df: DataFrame, table_name: str, jdbc_url: str, user: str, 
       .mode(mode) \
       .save()
 
-def write_df_to_postgres(df: DataFrame, table_name: str, jdbc_url: str, user: str, password: str, mode="append"):
+def write_df_to_postgres(df: DataFrame, table_name: str, jdbc_url: str, user: str, password: str, mode="overwrite"):
     df.write \
       .format("jdbc") \
       .option("url", jdbc_url) \
@@ -55,3 +59,14 @@ def write_df_to_postgres(df: DataFrame, table_name: str, jdbc_url: str, user: st
       .option("driver", "org.postgresql.Driver") \
       .mode(mode) \
       .save()
+      
+      
+def read_from_mysql(spark: SparkSession, table_name: str, jdbc_url: str, user: str, password: str) -> DataFrame:
+    """Read from MySQL"""
+    return spark.read.format("jdbc") \
+        .option("url", jdbc_url) \
+        .option("dbtable", table_name) \
+        .option("user", user) \
+        .option("password", password) \
+        .option("driver", "com.mysql.cj.jdbc.Driver") \
+        .load()
