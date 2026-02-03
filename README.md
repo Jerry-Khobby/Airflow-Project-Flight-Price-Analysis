@@ -445,6 +445,5 @@ docker-compose down -v
 
 Include:
 
-```
-airflow.drawio.png
-```
+![System Architecture](./airflow.drawio.png)
+
